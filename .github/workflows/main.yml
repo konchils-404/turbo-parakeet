@@ -1,33 +1,109 @@
-name: Simple SSH Access
+name: SSH Tailscale 6 Jam
 
 on:
   workflow_dispatch:
 
 jobs:
-  ssh-access:
+  ssh-tailscale:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 360  # 6 jam
 
     steps:
+      - name: Install Tailscale
+        run: |
+          curl -fsSL https://tailscale.com/install.sh | sh
+          sudo tailscale up --auth-key=${{ secrets.TAILSCALE_AUTH_KEY }} --hostname=gh-6hours-${{ github.run_id }}
+
       - name: Setup SSH Server
         run: |
           sudo apt-get update
-          sudo apt-get install -y openssh-server
-          echo "root:password123" | sudo chpasswd
-          sudo sed -i 's/#PermitRootLogin yes/PermitRootLogin yes/' /etc/ssh/sshd_config
-          sudo service ssh restart
+          sudo apt-get install -y openssh-server net-tools
+          
+          # Setup user dan password
+          sudo useradd -m -s /bin/bash runner
+          echo "runner:tailscale123" | sudo chpasswd
+          sudo usermod -aG sudo runner
+          
+          # Configure SSH
+          sudo sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
+          sudo sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin no/' /etc/ssh/sshd_config
+          sudo systemctl restart ssh
 
-      - name: Show Connection Info
+      - name: Get Tailscale IP
         run: |
-          IP=$(hostname -I | awk '{print $1}')
-          echo "🟢 SSH READY!"
-          echo "IP: $IP"
-          echo "User: root"
-          echo "Password: password123"
+          # Tunggu sampai Tailscale ready
+          sleep 10
+          TS_IP=$(tailscale ip -4)
+          if [ -z "$TS_IP" ]; then
+            echo "Waiting for Tailscale IP..."
+            sleep 10
+            TS_IP=$(tailscale ip -4)
+          fi
+          echo "TAILSCALE_IP=$TS_IP" >> $GITHUB_ENV
+          echo "✅ Tailscale IP: $TS_IP"
+
+      - name: Display Connection Info
+        run: |
           echo ""
-          echo "🚀 Connect with: ssh root@$IP"
+          echo "🟢 SSH VIA TAILSCALE READY - 6 JAM 🟢"
+          echo "=========================================="
+          echo "📍 IP: $TAILSCALE_IP"
+          echo "👤 User: runner"
+          echo "🔑 Password: tailscale123"
+          echo "⏰ Duration: 6 hours"
+          echo "🆔 Run ID: ${{ github.run_id }}"
+          echo ""
+          echo "🔗 Connect dengan:"
+          echo "ssh runner@$TAILSCALE_IP"
+          echo ""
+          echo "🔧 Atau dengan password langsung:"
+          echo "sshpass -p 'tailscale123' ssh runner@$TAILSCALE_IP"
+          echo "=========================================="
+          echo ""
 
-      - name: Keep Alive
+      - name: Install Useful Tools
         run: |
-          echo "⏰ Waiting for SSH connections (2 hours max)..."
-          sleep 7200
+          # Install tools yang berguna
+          sudo apt-get install -y \
+            htop \
+            nano \
+            vim \
+            curl \
+            wget \
+            git \
+            tree \
+            unzip \
+            zip \
+            python3 \
+            python3-pip
+
+      - name: Monitor Connection (6 Hours)
+        run: |
+          echo "🔄 Menjaga koneksi aktif selama 6 jam..."
+          echo "⏰ Started at: $(date)"
+          echo "🛑 Will auto-stop at: $(date -d '+6 hours')"
+          echo ""
+          
+          # Counter untuk menampilkan progress
+          total_seconds=21600  # 6 jam dalam detik
+          interval=300         # Update setiap 5 menit
+          counter=0
+          
+          while [ $counter -lt $total_seconds ]; do
+            minutes_passed=$((counter / 60))
+            minutes_remaining=$(( (total_seconds - counter) / 60 ))
+            
+            echo "[$(date)] Still running... ${minutes_passed}m passed, ${minutes_remaining}m remaining"
+            
+            # Test SSH connection
+            if nc -z $TAILSCALE_IP 22 2>/dev/null; then
+              echo "✅ SSH port 22 accessible"
+            else
+              echo "❌ SSH port not accessible"
+            fi
+            
+            sleep $interval
+            counter=$((counter + interval))
+          done
+          
+          echo "⏰ Time's up! 6 hours completed."
