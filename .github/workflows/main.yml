@@ -1,29 +1,33 @@
-name: SSH with Tailscale
+name: Simple SSH Access
 
 on:
   workflow_dispatch:
 
 jobs:
-  ssh-tailscale:
+  ssh-access:
     runs-on: ubuntu-latest
     timeout-minutes: 120
 
     steps:
-      - name: Install Tailscale
+      - name: Setup SSH Server
         run: |
-          curl -fsSL https://tailscale.com/install.sh | sh
-          sudo tailscale up --auth-key=${{ secrets.TAILSCALE_AUTH_KEY }}
-
-      - name: Setup SSH
-        run: |
-          sudo apt install -y openssh-server
-          echo "root:tailscale123" | sudo chpasswd
+          sudo apt-get update
+          sudo apt-get install -y openssh-server
+          echo "root:password123" | sudo chpasswd
           sudo sed -i 's/#PermitRootLogin yes/PermitRootLogin yes/' /etc/ssh/sshd_config
           sudo service ssh restart
 
-      - name: Show Tailscale IP
+      - name: Show Connection Info
         run: |
-          IP=$(tailscale ip -4)
-          echo "🔗 Connect via Tailscale:"
-          echo "ssh root@$IP"
-          echo "📋 Password: tailscale123"
+          IP=$(hostname -I | awk '{print $1}')
+          echo "🟢 SSH READY!"
+          echo "IP: $IP"
+          echo "User: root"
+          echo "Password: password123"
+          echo ""
+          echo "🚀 Connect with: ssh root@$IP"
+
+      - name: Keep Alive
+        run: |
+          echo "⏰ Waiting for SSH connections (2 hours max)..."
+          sleep 7200
