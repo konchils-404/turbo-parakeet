@@ -1,0 +1,29 @@
+name: SSH with Tailscale
+
+on:
+  workflow_dispatch:
+
+jobs:
+  ssh-tailscale:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Install Tailscale
+        run: |
+          curl -fsSL https://tailscale.com/install.sh | sh
+          sudo tailscale up --auth-key=${{ secrets.TAILSCALE_AUTH_KEY }}
+
+      - name: Setup SSH
+        run: |
+          sudo apt install -y openssh-server
+          echo "root:tailscale123" | sudo chpasswd
+          sudo sed -i 's/#PermitRootLogin yes/PermitRootLogin yes/' /etc/ssh/sshd_config
+          sudo service ssh restart
+
+      - name: Show Tailscale IP
+        run: |
+          IP=$(tailscale ip -4)
+          echo "🔗 Connect via Tailscale:"
+          echo "ssh root@$IP"
+          echo "📋 Password: tailscale123"
