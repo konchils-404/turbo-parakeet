@@ -1,4 +1,4 @@
-name: Simple Tailscale SSH
+name: Simple Tailscale SSH - Fixed
 
 on:
   workflow_dispatch:
@@ -15,22 +15,32 @@ jobs:
           curl -fsSL https://tailscale.com/install.sh | sh
           sudo tailscale up --auth-key=${{ secrets.TAILSCALE_AUTH_KEY }}
           
-          # Setup SSH
+          # Setup SSH dengan user baru
           sudo apt install -y openssh-server
-          echo "ubuntu:tailscale123" | sudo chpasswd
-          sudo sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sssd_config
-          sudo service ssh restart
+          sudo useradd -m -s /bin/bash myuser
+          echo "myuser:password123" | sudo chpasswd
+          sudo usermod -aG sudo myuser
+          
+          sudo sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
+          sudo systemctl restart ssh
 
-      - name: Show Info
+      - name: Show Connection Info
         run: |
-          sleep 5
+          sleep 10
           IP=$(tailscale ip -4)
-          echo "🚀 SSH READY - 6 JAM"
-          echo "IP: $IP"
-          echo "User: ubuntu"
-          echo "Pass: tailscale123"
           echo ""
-          echo "Konek: ssh ubuntu@$IP"
+          echo "🚀 SSH READY - 6 JAM"
+          echo "========================"
+          echo "IP: $IP"
+          echo "User: myuser"
+          echo "Password: password123"
+          echo "========================"
+          echo ""
+          echo "Konek dengan:"
+          echo "ssh myuser@$IP"
 
       - name: Wait 6 hours
-        run: sleep 21600
+        run: |
+          echo "⏳ Menunggu koneksi SSH selama 6 jam..."
+          sleep 21600
+          echo "✅ Waktu habis - Workflow selesai"
